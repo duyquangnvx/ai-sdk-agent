@@ -1,0 +1,147 @@
+graph TB
+    subgraph "User Interface Layer"
+        USER[User Input/Commands]
+        TERMINAL[Terminal UI<br/>React + Ink]
+        OUTPUT[Output Display<br/>Status/Results]
+    end
+
+    subgraph "Main Agent Thread"
+        PROMPT[System Prompt<br/>~2800 tokens]
+        CLAUDEMD[CLAUDE.md Context<br/>Project-specific info]
+        CONVERSATION[Conversation History<br/>Message Management]
+        COMPACT[Compact Feature<br/>Auto-summarize when full]
+    end
+
+    subgraph "Planning & Decision Layer"
+        THINKING[Extended Thinking<br/>Interleaved Mode]
+        PLANNER[Task Planning<br/>Break down tasks]
+        DECISION{Need<br/>Sub-agent?}
+    end
+
+    subgraph "Execution Layer"
+        subgraph "Tools System (9400 tokens)"
+            BASH[Bash Tool<br/>Execute commands]
+            FILE_OPS[File Operations<br/>create/edit/view]
+            GIT[Git Operations<br/>commit/PR]
+            SEARCH[Web Search]
+            MCP[MCP Tools<br/>External integrations]
+        end
+        
+        subgraph "Skills System"
+            SKILL_META[Skill Meta-tool<br/>Load SKILL.md]
+            SKILL_INJECT[Context Injection<br/>Modify permissions]
+            SKILL_EXEC[Skill Execution<br/>Domain expertise]
+        end
+    end
+
+    subgraph "Sub-agent System (Max 1 Level)"
+        SUBAGENT[Sub-agent Clone<br/>Isolated context]
+        SUB_TOOLS[Limited Tool Access<br/>No nested spawning]
+        SUB_RESULT[Sub-agent Result<br/>Return to main]
+    end
+
+    subgraph "Context Management"
+        CODEBASE[Codebase Index<br/>File structure awareness]
+        MEMORY[Session Memory<br/>Task history]
+        CONFIG[Configuration<br/>.claude/ directory]
+    end
+
+    subgraph "External Systems"
+        MCP_SERVERS[MCP Servers<br/>Google Drive, Slack, etc.]
+        GH_API[GitHub/GitLab API]
+        WEB[Web Resources]
+        FS[File System]
+    end
+
+    subgraph "Model Selection"
+        HAIKU[Claude Haiku<br/>Fast/cheap tasks<br/>50% of calls]
+        SONNET[Claude Sonnet 4.5<br/>Default model<br/>Daily workhorse]
+        OPUS[Claude Opus 4.5<br/>Complex tasks<br/>Max plan only]
+    end
+
+    subgraph "Feedback Loop"
+        GATHER[1. Gather Context<br/>Read files, search]
+        ACTION[2. Take Action<br/>Edit, execute]
+        VERIFY[3. Verify Work<br/>Test, lint]
+        REPEAT[4. Repeat<br/>Until complete]
+    end
+
+    %% User flow
+    USER --> TERMINAL
+    TERMINAL --> PROMPT
+    
+    %% Main processing
+    PROMPT --> CLAUDEMD
+    CLAUDEMD --> CONVERSATION
+    CONVERSATION --> THINKING
+    THINKING --> PLANNER
+    PLANNER --> DECISION
+    
+    %% Decision paths
+    DECISION -->|Simple task| BASH
+    DECISION -->|Complex task| SUBAGENT
+    DECISION -->|Need expertise| SKILL_META
+    
+    %% Tools execution
+    BASH --> FILE_OPS
+    FILE_OPS --> GIT
+    BASH --> MCP
+    MCP --> MCP_SERVERS
+    
+    %% Skills flow
+    SKILL_META --> SKILL_INJECT
+    SKILL_INJECT --> SKILL_EXEC
+    SKILL_EXEC --> BASH
+    
+    %% Sub-agent flow
+    SUBAGENT --> SUB_TOOLS
+    SUB_TOOLS --> SUB_RESULT
+    SUB_RESULT --> CONVERSATION
+    
+    %% Context sources
+    CODEBASE --> PROMPT
+    CONFIG --> PROMPT
+    MEMORY --> CONVERSATION
+    
+    %% External interactions
+    GIT --> GH_API
+    BASH --> FS
+    SEARCH --> WEB
+    
+    %% Model selection
+    PLANNER -.->|Task complexity| HAIKU
+    PLANNER -.->|Standard| SONNET
+    PLANNER -.->|Complex| OPUS
+    
+    %% Feedback loop
+    BASH --> GATHER
+    GATHER --> ACTION
+    ACTION --> VERIFY
+    VERIFY --> REPEAT
+    REPEAT --> DECISION
+    
+    %% Output
+    FILE_OPS --> OUTPUT
+    SUB_RESULT --> OUTPUT
+    VERIFY --> OUTPUT
+    OUTPUT --> TERMINAL
+    TERMINAL --> USER
+    
+    %% Compact management
+    CONVERSATION -->|Context full| COMPACT
+    COMPACT --> CONVERSATION
+
+    %% Styling
+    classDef userLayer fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef mainAgent fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef execution fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef subAgent fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef external fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef models fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    
+    class USER,TERMINAL,OUTPUT userLayer
+    class PROMPT,CLAUDEMD,CONVERSATION,COMPACT,THINKING,PLANNER mainAgent
+    class BASH,FILE_OPS,GIT,SEARCH,MCP,SKILL_META,SKILL_INJECT,SKILL_EXEC execution
+    class SUBAGENT,SUB_TOOLS,SUB_RESULT subAgent
+    class MCP_SERVERS,GH_API,WEB,FS external
+    class HAIKU,SONNET,OPUS models
