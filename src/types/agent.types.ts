@@ -1,4 +1,4 @@
-import type { LanguageModel, ModelMessage, Tool } from 'ai';
+import type { LanguageModel, ModelMessage, Tool, TextStreamPart } from 'ai';
 import type { z } from 'zod';
 import type { ContextConfig, ConversationHistory } from './context.types.js';
 
@@ -6,7 +6,27 @@ import type { ContextConfig, ConversationHistory } from './context.types.js';
  * Re-export useful AI SDK types for convenience
  * Users can import from 'ai-sdk-agent' instead of 'ai' directly
  */
-export type { LanguageModel, ModelMessage } from 'ai';
+export type { LanguageModel, ModelMessage, TextStreamPart } from 'ai';
+
+/**
+ * Tool set type alias
+ */
+export type ToolSet = Record<string, Tool>;
+
+/**
+ * Stream part type for agent streaming
+ * This is the AI SDK's TextStreamPart with our tool set
+ *
+ * Includes all stream events:
+ * - start, finish, abort, error
+ * - start-step, finish-step
+ * - text-start, text-delta, text-end
+ * - reasoning-start, reasoning-delta, reasoning-end
+ * - tool-input-start, tool-input-delta, tool-input-end
+ * - tool-call, tool-result, tool-error
+ * - source, file
+ */
+export type AgentStreamPart<TTools extends ToolSet = ToolSet> = TextStreamPart<TTools>;
 
 /**
  * Core agent configuration
@@ -310,28 +330,6 @@ export interface ExecuteOptions<TCallOptions = unknown> {
   /** Callback for receiving text chunks during streaming */
   onTextChunk?: (chunk: string, accumulated: string) => void;
 }
-
-/**
- * Text chunk event during streaming
- */
-export interface TextChunkEvent {
-  type: 'text-chunk';
-  chunk: string;
-  accumulated: string;
-}
-
-/**
- * Step complete event during streaming
- */
-export interface StepCompleteEvent {
-  type: 'step-complete';
-  step: AgentStep;
-}
-
-/**
- * Stream event - can be either a text chunk or a completed step
- */
-export type StreamEvent = TextChunkEvent | StepCompleteEvent;
 
 /**
  * Options for spawning sub-agents

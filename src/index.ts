@@ -59,7 +59,10 @@ export type {
   // Re-exported AI SDK types (convenience)
   LanguageModel,
   ModelMessage,
+  TextStreamPart,
   // Agent types
+  ToolSet,
+  AgentStreamPart,
   AgentConfig,
   SubAgentConfig,
   InstructionsLoader,
@@ -77,10 +80,6 @@ export type {
   AgentState,
   ExecuteOptions,
   SpawnSubAgentOptions,
-  // Streaming types
-  TextChunkEvent,
-  StepCompleteEvent,
-  StreamEvent,
 } from './types/agent.types.js';
 
 export type {

@@ -1,4 +1,11 @@
-import { generateText, streamText, type LanguageModel, type ModelMessage, type Tool } from 'ai';
+import {
+  generateText,
+  streamText,
+  type LanguageModel,
+  type ModelMessage,
+  type Tool,
+  type TextStreamPart,
+} from 'ai';
 import { randomUUID } from 'crypto';
 import type {
   AgentConfig,
@@ -8,7 +15,7 @@ import type {
   AgentUsageStats,
   ExecuteOptions,
   SpawnSubAgentOptions,
-  StreamEvent,
+  ToolSet,
 } from '../types/agent.types.js';
 import type { ConversationHistory } from '../types/context.types.js';
 import { ContextManager } from '../context/context-manager.js';
@@ -140,12 +147,41 @@ export class Agent<TCallOptions = unknown> {
 
   /**
    * Stream agent execution
-   * Yields StreamEvent which can be either text chunks or completed steps
+   *
+   * Yields AI SDK's TextStreamPart events directly, giving full access to:
+   * - text-delta: Text chunks as they arrive
+   * - reasoning-delta: Claude's extended thinking (if enabled)
+   * - tool-call, tool-result, tool-error: Tool execution events
+   * - start, finish, error: Lifecycle events
+   * - And more (see AI SDK docs)
+   *
+   * @example
+   * // Full control with all events
+   * for await (const part of agent.stream('Hello')) {
+   *   switch (part.type) {
+   *     case 'text-delta':
+   *       process.stdout.write(part.text);
+   *       break;
+   *     case 'tool-call':
+   *       console.log('Tool called:', part.toolName);
+   *       break;
+   *     case 'reasoning-delta':
+   *       console.log('Thinking:', part.text);
+   *       break;
+   *   }
+   * }
+   *
+   * // Simple text streaming with callback
+   * for await (const part of agent.stream('Hello', {
+   *   onTextChunk: (chunk) => process.stdout.write(chunk),
+   * })) {
+   *   // Just consume the stream
+   * }
    */
   async *stream(
     input: string,
     options?: ExecuteOptions<TCallOptions>
-  ): AsyncGenerator<StreamEvent, AgentResult> {
+  ): AsyncGenerator<TextStreamPart<ToolSet>, AgentResult> {
     this.startedAt = new Date();
     this.status = 'running';
     this.steps = [];
@@ -169,18 +205,13 @@ export class Agent<TCallOptions = unknown> {
 
       this.contextManager.addUserMessage(input);
 
-      // Execute with streaming
-      for await (const event of this.executeLoopStreaming(
+      // Execute with streaming - yields AI SDK stream parts directly
+      yield* this.executeLoopStreaming(
         systemPrompt,
         execConfig,
         options?.signal,
         options?.onTextChunk
-      )) {
-        if (event.type === 'step-complete') {
-          this.steps.push(event.step);
-        }
-        yield event;
-      }
+      );
 
       this.status = 'completed';
       this.completedAt = new Date();
@@ -521,7 +552,7 @@ export class Agent<TCallOptions = unknown> {
     execConfig: Partial<AgentConfig<TCallOptions>>,
     signal?: AbortSignal,
     onTextChunk?: (chunk: string, accumulated: string) => void
-  ): AsyncGenerator<StreamEvent> {
+  ): AsyncGenerator<TextStreamPart<ToolSet>> {
     const maxSteps = execConfig.maxSteps ?? this.config.maxSteps ?? 20;
     let currentStep = 0;
 
@@ -547,52 +578,68 @@ export class Agent<TCallOptions = unknown> {
       });
 
       let fullText = '';
+      let hasToolCalls = false;
+      const toolCallsCollected: Array<{ toolCallId: string; toolName: string; input: unknown }> = [];
+      const toolResultsCollected: Array<{ toolCallId: string; toolName: string; output: unknown }> = [];
 
-      // Stream text chunks as they arrive
-      for await (const chunk of response.textStream) {
-        fullText += chunk;
+      // Stream all events via fullStream
+      for await (const part of response.fullStream) {
+        // Yield the raw AI SDK event
+        yield part as TextStreamPart<ToolSet>;
 
-        // Yield text chunk event
-        yield {
-          type: 'text-chunk' as const,
-          chunk,
-          accumulated: fullText,
-        };
+        // Track state for our internal bookkeeping
+        switch (part.type) {
+          case 'text-delta':
+            fullText += part.text;
+            // Call onTextChunk callback for simple use case
+            onTextChunk?.(part.text, fullText);
+            break;
 
-        // Call onTextChunk callback if provided
-        onTextChunk?.(chunk, fullText);
+          case 'tool-call':
+            hasToolCalls = true;
+            toolCallsCollected.push({
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              input: part.input,
+            });
+            break;
+
+          case 'tool-result':
+            toolResultsCollected.push({
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              output: part.output,
+            });
+            break;
+
+          case 'finish-step':
+            // Update usage from step
+            if (part.usage) {
+              this.usage.inputTokens += part.usage.inputTokens ?? 0;
+              this.usage.outputTokens += part.usage.outputTokens ?? 0;
+              this.usage.totalTokens += (part.usage.inputTokens ?? 0) + (part.usage.outputTokens ?? 0);
+            }
+            break;
+        }
       }
 
-      // Get final results - these are promises that need to be awaited
-      const [usage, toolCallsResult, toolResultsResult] = await Promise.all([
-        response.usage,
-        response.toolCalls,
-        response.toolResults,
-      ]);
-
-      if (usage) {
-        this.usage.inputTokens += usage.inputTokens ?? 0;
-        this.usage.outputTokens += usage.outputTokens ?? 0;
-        this.usage.totalTokens += (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
-      }
-
-      if (toolCallsResult && toolCallsResult.length > 0) {
-        const toolResults = toolResultsResult as Array<{ toolCallId: string; toolName: string; output: unknown }> | undefined;
-
-        for (const toolCall of toolCallsResult) {
+      if (hasToolCalls) {
+        // Record tool call steps
+        for (const toolCall of toolCallsCollected) {
           this.usage.toolCalls++;
 
           const step: AgentStep = {
             stepNumber: currentStep,
             type: 'tool-call',
             input: toolCall.input,
-            output: toolResults?.find((r) => r.toolCallId === toolCall.toolCallId)?.output,
+            output: toolResultsCollected.find((r) => r.toolCallId === toolCall.toolCallId)?.output,
             timestamp: new Date(),
             duration: Date.now() - stepStart,
             toolName: toolCall.toolName,
           };
 
-          yield { type: 'step-complete' as const, step };
+          this.steps.push(step);
+          await this.config.onStep?.(step);
           currentStep++;
         }
 
@@ -602,6 +649,7 @@ export class Agent<TCallOptions = unknown> {
           this.contextManager.addMessage(msg as ModelMessage);
         }
       } else {
+        // Text generation step
         const step: AgentStep = {
           stepNumber: currentStep,
           type: 'text-generation',
@@ -611,7 +659,8 @@ export class Agent<TCallOptions = unknown> {
           duration: Date.now() - stepStart,
         };
 
-        yield { type: 'step-complete' as const, step };
+        this.steps.push(step);
+        await this.config.onStep?.(step);
         this.contextManager.addAssistantMessage(fullText);
         break;
       }
