@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git ls-tree:*)",
+      "Bash(git -C \"D:\\\\Workspace\\\\Personal\\\\Code\\\\ai-sdk-agent\" log --oneline -10)",
+      "Bash(npm run typecheck:*)"
+    ]
+  }
+}
