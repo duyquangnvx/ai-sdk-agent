@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Assistant Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #f5f5f5; height: 100vh; display: flex; flex-direction: column; }
+
+    /* Header */
+    .header { background: #333; color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 20px; }
+    .header h1 { font-size: 16px; }
+    .status { display: flex; align-items: center; gap: 8px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #888; }
+    .status-dot.connected { background: #4caf50; }
+    .status-dot.connecting { background: #ff9800; }
+    .session-info { color: #aaa; font-size: 12px; }
+
+    /* Controls */
+    .controls { background: #fff; padding: 10px 20px; border-bottom: 1px solid #ddd; display: flex; gap: 10px; align-items: center; }
+    .controls input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; width: 200px; }
+    .controls button { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
+    .controls button.primary { background: #2196f3; color: #fff; }
+    .controls button.danger { background: #f44336; color: #fff; }
+    .controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Main content */
+    .main { flex: 1; display: flex; overflow: hidden; }
+
+    /* Chat panel */
+    .chat-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #ddd; }
+    .messages { flex: 1; overflow-y: auto; padding: 20px; background: #fff; }
+    .message { margin-bottom: 16px; max-width: 80%; }
+    .message.user { margin-left: auto; }
+    .message.user .bubble { background: #2196f3; color: #fff; }
+    .message.assistant .bubble { background: #e0e0e0; }
+    .bubble { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; }
+    .message .label { font-size: 10px; color: #888; margin-bottom: 4px; }
+    .message.user .label { text-align: right; }
+
+    /* Tool calls */
+    .tool-calls { margin-top: 8px; font-size: 12px; }
+    .tool-call { background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; }
+    .tool-call-header { padding: 6px 10px; background: #eee; cursor: pointer; display: flex; justify-content: space-between; }
+    .tool-call-body { padding: 10px; display: none; overflow-x: auto; }
+    .tool-call-body.open { display: block; }
+    .tool-call-body pre { margin: 0; font-size: 11px; }
+
+    /* Chat input */
+    .chat-input { padding: 10px 20px; background: #fff; border-top: 1px solid #ddd; display: flex; gap: 10px; }
+    .chat-input input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    .chat-input button { padding: 10px 20px; background: #2196f3; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .chat-input button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Debug panel */
+    .debug-panel { width: 400px; display: flex; flex-direction: column; background: #1e1e1e; }
+    .debug-header { padding: 10px; color: #fff; font-size: 12px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
+    .debug-header button { background: #444; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    .debug-log { flex: 1; overflow-y: auto; padding: 10px; font-size: 11px; }
+    .log-entry { margin-bottom: 8px; padding: 6px; border-radius: 4px; }
+    .log-entry.incoming { background: #1a3a1a; color: #4caf50; }
+    .log-entry.outgoing { background: #1a1a3a; color: #64b5f6; }
+    .log-entry.error { background: #3a1a1a; color: #f44336; }
+    .log-entry.info { background: #333; color: #aaa; }
+    .log-entry .time { color: #888; margin-right: 8px; }
+    .log-entry pre { margin: 4px 0 0 0; white-space: pre-wrap; word-wrap: break-word; }
+
+    /* Plan modal */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }
+    .modal-header { padding: 16px; border-bottom: 1px solid #ddd; font-weight: bold; }
+    .modal-body { padding: 16px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 16px; border-top: 1px solid #ddd; display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-footer button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; }
+    .modal-footer .approve { background: #4caf50; color: #fff; }
+    .modal-footer .reject { background: #f44336; color: #fff; }
+    .plan-step { margin: 8px 0; padding: 8px; background: #f5f5f5; border-radius: 4px; }
+    .plan-step .step-id { font-weight: bold; color: #2196f3; }
+
+    /* Ask Modal */
+    .ask-modal .modal { max-width: 600px; }
+    .ask-modal .question-group { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+    .ask-modal .question-group:last-child { border-bottom: none; margin-bottom: 0; }
+    .ask-modal .question-label { font-weight: bold; margin-bottom: 4px; }
+    .ask-modal .question-label .required { color: #f44336; }
+    .ask-modal .question-desc { color: #666; font-size: 12px; margin-bottom: 8px; }
+
+    /* Option styles */
+    .ask-modal .option-item { display: flex; align-items: flex-start; margin: 6px 0; padding: 8px; background: #f9f9f9; border-radius: 4px; cursor: pointer; }
+    .ask-modal .option-item:hover { background: #f0f0f0; }
+    .ask-modal .option-item input { margin-right: 10px; margin-top: 2px; }
+    .ask-modal .option-content { flex: 1; }
+    .ask-modal .option-label { font-weight: 500; }
+    .ask-modal .option-desc { color: #888; font-size: 11px; margin-top: 2px; }
+
+    /* Text/Number input */
+    .ask-modal .text-input, .ask-modal .number-input {
+      width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+    }
+
+    /* Confirm buttons */
+    .ask-modal .confirm-buttons { display: flex; gap: 10px; }
+    .ask-modal .confirm-btn { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-size: 14px; background: #fff; }
+    .ask-modal .confirm-btn:hover { background: #f5f5f5; }
+    .ask-modal .confirm-btn.selected { border-color: #2196f3; background: #e3f2fd; }
+    .ask-modal .confirm-btn.yes.selected { border-color: #4caf50; background: #e8f5e9; }
+    .ask-modal .confirm-btn.no.selected { border-color: #f44336; background: #ffebee; }
+
+    /* Message content container */
+    .message .content { display: flex; flex-direction: column; gap: 8px; }
+
+    /* Text segments */
+    .text-segment {
+      background: #e0e0e0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .text-segment.streaming::after {
+      content: '▋';
+      animation: blink 1s infinite;
+    }
+
+    /* Inline tool calls (interleaved with text) */
+    .tool-call.inline {
+      background: #fff3e0;
+      border: 1px solid #ffb74d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .tool-call.inline .tool-call-header {
+      background: #ffe0b2;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .tool-call.inline .tool-icon { font-size: 14px; }
+    .tool-call.inline .tool-name { font-weight: bold; flex: 1; }
+    .tool-call.inline .tool-status {
+      font-size: 11px;
+      color: #e65100;
+      background: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .tool-call.inline .tool-status.done { color: #2e7d32; background: #e8f5e9; }
+    .tool-call.inline .toggle { color: #888; }
+    .tool-call.inline .tool-call-body {
+      padding: 10px 12px;
+      background: #fff;
+      display: none;
+      font-size: 12px;
+    }
+    .tool-call.inline .tool-call-body.open { display: block; }
+    .tool-call.inline .tool-call-body pre {
+      margin: 4px 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      background: #f5f5f5;
+      padding: 8px;
+      border-radius: 4px;
+    }
+
+    /* Error segment */
+    .error-segment {
+      background: #ffebee;
+      color: #c62828;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #ef9a9a;
+    }
+
+    /* Streaming animation */
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Game Assistant Demo</h1>
+    <div class="status">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Disconnected</span>
+    </div>
+    <div class="session-info" id="sessionInfo"></div>
+  </div>
+
+  <div class="controls">
+    <input type="text" id="serverUrl" placeholder="Server URL" value="http://localhost:3000">
+    <input type="text" id="playerId" placeholder="Player ID" value="demo-player-1">
+    <button class="primary" id="connectBtn" onclick="createSession()">Connect</button>
+    <button class="danger" id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+  </div>
+
+  <div class="main">
+    <div class="chat-panel">
+      <div class="messages" id="messages"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendChat()" disabled>
+        <button id="sendBtn" onclick="sendChat()" disabled>Send</button>
+      </div>
+    </div>
+
+    <div class="debug-panel">
+      <div class="debug-header">
+        <span>Debug Log</span>
+        <button onclick="clearLog()">Clear</button>
+      </div>
+      <div class="debug-log" id="debugLog"></div>
+    </div>
+  </div>
+
+  <!-- Plan Approval Modal -->
+  <div class="modal-overlay" id="planModal">
+    <div class="modal">
+      <div class="modal-header" id="planTitle">Plan Review</div>
+      <div class="modal-body" id="planBody"></div>
+      <div class="modal-footer">
+        <button class="reject" onclick="rejectPlan()">Reject</button>
+        <button class="approve" onclick="approvePlan()">Approve</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ask User Modal -->
+  <div class="modal-overlay ask-modal" id="askModal">
+    <div class="modal">
+      <div class="modal-header" id="askTitle">Questions from Assistant</div>
+      <div class="modal-body" id="askBody"></div>
+      <div class="modal-footer">
+        <button class="reject" onclick="cancelAsk()">Cancel</button>
+        <button class="approve" onclick="submitAsk()">Submit</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ==================== State ====================
+let ws = null;
+let sessionId = null;
+let pendingPlan = null;
+let pendingAsk = null;
+let nextBlockId = 100;
+
+// ==================== Mock Data ====================
+const mockData = {
+  blocks: [
+    {
+      id: 1,
+      name: "Player",
+      tag: "player",
+      position: { x: 0, y: 1, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      type: 1,
+      is_physic_enabled: true,
+      physic: { mass: 1, is_static: false, bounce: 0.3, friction: 0.5 },
+      skills: [
+        {
+          skill_id: "skill-001",
+          skill_name: "Move Right",
+          enabled: true,
+          description: "Move player to the right on key press",
+          trigger_type: "keyboard",
+          trigger_config: { key: "D", mode: "hold" },
+          command_script: "move_x(5)"
+        },
+        {
+          skill_id: "skill-002",
+          skill_name: "Jump",
+          enabled: true,
+          description: "Make player jump",
+          trigger_type: "keyboard",
+          trigger_config: { key: "SPACE", mode: "press" },
+          command_script: "apply_impulse(0, 10, 0)"
+        }
+      ],
+      surface_colors: {}
+    },
+    {
+      id: 2,
+      name: "Enemy Slime",
+      tag: "enemy",
+      position: { x: 5, y: 1, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 0.8, y: 0.8, z: 0.8 },
+      type: 2,
+      is_physic_enabled: true,
+      physic: { mass: 0.5, is_static: false, bounce: 0.8, friction: 0.3 },
+      skills: [
+        {
+          skill_id: "skill-003",
+          skill_name: "Patrol",
+          enabled: true,
+          description: "Move back and forth",
+          trigger_type: "repeat_duration",
+          trigger_config: { duration: 2 },
+          command_script: "move_x(random(-3, 3))"
+        }
+      ],
+      surface_colors: {}
+    },
+    {
+      id: 3,
+      name: "Ground",
+      tag: "platform",
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 20, y: 0.5, z: 5 },
+      type: 3,
+      is_physic_enabled: true,
+      physic: { mass: 1, is_static: true, bounce: 0, friction: 0.8 },
+      skills: [],
+      surface_colors: {}
+    },
+    {
+      id: 4,
+      name: "Coin 1",
+      tag: "collectible",
+      position: { x: 3, y: 2, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 0.5, y: 0.5, z: 0.5 },
+      type: 4,
+      is_physic_enabled: false,
+      physic: { mass: 1, is_static: true, bounce: 0, friction: 0 },
+      skills: [
+        {
+          skill_id: "skill-004",
+          skill_name: "Collect",
+          enabled: true,
+          description: "Destroy when player touches",
+          trigger_type: "on_collide",
+          trigger_config: { target_tag: "player" },
+          command_script: "destroy_self()"
+        }
+      ],
+      surface_colors: {}
+    },
+    {
+      id: 5,
+      name: "Spike Trap",
+      tag: "hazard",
+      position: { x: -3, y: 0.5, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 0.5, z: 1 },
+      type: 5,
+      is_physic_enabled: true,
+      physic: { mass: 1, is_static: true, bounce: 0, friction: 0.5 },
+      skills: [
+        {
+          skill_id: "skill-005",
+          skill_name: "Damage Player",
+          enabled: true,
+          description: "Hurt player on contact",
+          trigger_type: "on_collide",
+          trigger_config: { target_tag: "player" },
+          command_script: "send_event('damage', 10)"
+        }
+      ],
+      surface_colors: {}
+    }
+  ],
+
+  settings: {
+    name: "Demo Game",
+    created_at: Date.now(),
+    blockCount: 5,
+    camera: {
+      type: 2,
+      position: { x: 0, y: 10, z: -10 },
+      look_at: { x: 0, y: 0, z: 0 },
+      object_id: 1,
+      view_type: 3,
+      distance: 15
+    }
+  },
+
+  blockTypes: [
+    { id: 1, name: "Character", description: "Humanoid character block", category: "character" },
+    { id: 2, name: "Slime", description: "Bouncy slime enemy", category: "character" },
+    { id: 3, name: "Platform", description: "Basic platform block", category: "basic" },
+    { id: 4, name: "Coin", description: "Collectible coin", category: "collectible" },
+    { id: 5, name: "Spike", description: "Hazard spike", category: "hazard" },
+    { id: 6, name: "Cube", description: "Basic cube block", category: "basic" },
+    { id: 7, name: "Sphere", description: "Basic sphere block", category: "basic" },
+    { id: 8, name: "Car", description: "Vehicle block", category: "vehicle" }
+  ]
+};
+
+// ==================== Logging ====================
+function log(type, direction, data) {
+  const debugLog = document.getElementById('debugLog');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+
+  const time = new Date().toLocaleTimeString();
+  const prefix = direction === 'in' ? '← IN' : direction === 'out' ? '→ OUT' : 'INFO';
+
+  let content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  entry.innerHTML = `<span class="time">[${time}]</span><strong>${prefix}</strong><pre>${content}</pre>`;
+
+  debugLog.appendChild(entry);
+  debugLog.scrollTop = debugLog.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('debugLog').innerHTML = '';
+}
+
+// ==================== UI Updates ====================
+function updateStatus(status, text) {
+  const dot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  dot.className = 'status-dot ' + status;
+  statusText.textContent = text;
+}
+
+function updateSessionInfo(info) {
+  document.getElementById('sessionInfo').textContent = info;
+}
+
+function setControlsEnabled(connected) {
+  document.getElementById('connectBtn').disabled = connected;
+  document.getElementById('disconnectBtn').disabled = !connected;
+  document.getElementById('chatInput').disabled = !connected;
+  document.getElementById('sendBtn').disabled = !connected;
+  document.getElementById('serverUrl').disabled = connected;
+  document.getElementById('playerId').disabled = connected;
+}
+
+function addMessage(role, content, toolCalls) {
+  const messages = document.getElementById('messages');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `message ${role}`;
+
+  let html = `<div class="label">${role === 'user' ? 'You' : 'Assistant'}</div>`;
+  html += `<div class="bubble">${escapeHtml(content)}</div>`;
+
+  if (toolCalls && toolCalls.length > 0) {
+    html += '<div class="tool-calls">';
+    toolCalls.forEach((tc, i) => {
+      html += `
+        <div class="tool-call">
+          <div class="tool-call-header" onclick="toggleToolCall(this)">
+            <span>${tc.name}</span>
+            <span>▼</span>
+          </div>
+          <div class="tool-call-body">
+            <pre><strong>Args:</strong>\n${JSON.stringify(tc.args, null, 2)}</pre>
+            <pre><strong>Result:</strong>\n${JSON.stringify(tc.result, null, 2)}</pre>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+  }
+
+  msgDiv.innerHTML = html;
+  messages.appendChild(msgDiv);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function toggleToolCall(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+  const toggle = header.querySelector('.toggle') || header.querySelector('span:last-child');
+  if (toggle) {
+    toggle.textContent = body.classList.contains('open') ? '▲' : '▼';
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ==================== Session & WebSocket ====================
+async function createSession() {
+  const serverUrl = document.getElementById('serverUrl').value;
+  const playerId = document.getElementById('playerId').value;
+
+  updateStatus('connecting', 'Creating session...');
+  log('info', '', 'Creating session...');
+
+  try {
+    const response = await fetch(`${serverUrl}/api/game/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    sessionId = data.session.id;
+
+    log('info', '', `Session created: ${sessionId}`);
+    updateSessionInfo(`Session: ${sessionId.substring(0, 8)}...`);
+
+    // Connect WebSocket
+    connectWebSocket(serverUrl);
+  } catch (error) {
+    log('error', '', `Failed to create session: ${error.message}`);
+    updateStatus('', 'Error');
+    alert(`Failed to create session: ${error.message}`);
+  }
+}
+
+function connectWebSocket(serverUrl) {
+  const wsUrl = serverUrl.replace(/^http/, 'ws') + `/ws?sessionId=${sessionId}`;
+  log('info', '', `Connecting to ${wsUrl}`);
+
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    log('info', '', 'WebSocket connected');
+    updateStatus('connected', 'Connected');
+    setControlsEnabled(true);
+  };
+
+  ws.onclose = (event) => {
+    log('info', '', `WebSocket closed: ${event.code} ${event.reason}`);
+    updateStatus('', 'Disconnected');
+    setControlsEnabled(false);
+    ws = null;
+  };
+
+  ws.onerror = (error) => {
+    log('error', '', 'WebSocket error');
+    console.error('WebSocket error:', error);
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      log('incoming', 'in', msg);
+      handleRpcMessage(msg);
+    } catch (error) {
+      log('error', '', `Failed to parse message: ${error.message}`);
+    }
+  };
+}
+
+function disconnect() {
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+  sessionId = null;
+  updateStatus('', 'Disconnected');
+  updateSessionInfo('');
+  setControlsEnabled(false);
+  log('info', '', 'Disconnected');
+}
+
+function sendRpc(msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    log('outgoing', 'out', msg);
+    ws.send(JSON.stringify(msg));
+  }
+}
+
+// ==================== RPC Handlers ====================
+function handleRpcMessage(msg) {
+  // Server calling us (has method)
+  if (msg.method) {
+    handleServerRequest(msg);
+  }
+}
+
+async function handleServerRequest(msg) {
+  const { id, method, params } = msg;
+
+  try {
+    const handler = rpcHandlers[method];
+    if (!handler) {
+      sendRpc({
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: `Method not found: ${method}` }
+      });
+      return;
+    }
+
+    const result = await handler(params);
+    // Return raw result - RPC caller will wrap it
+    sendRpc({
+      jsonrpc: '2.0',
+      id,
+      result: result
+    });
+  } catch (error) {
+    // Return JSON-RPC error format
+    sendRpc({
+      jsonrpc: '2.0',
+      id,
+      error: { code: -32000, message: error.message }
+    });
+  }
+}
+
+const rpcHandlers = {
+  'game.listBlocks': (params) => {
+    const blocks = mockData.blocks.map(b => ({
+      id: b.id,
+      name: b.name,
+      tag: b.tag,
+      position: b.position,
+      type: b.type,
+      skillCount: b.skills.length
+    }));
+    return { blocks };
+  },
+
+  'game.getBlock': (params) => {
+    const block = mockData.blocks.find(b => b.id === params.blockId);
+    if (!block) throw new Error(`Block ${params.blockId} not found`);
+    return { block };
+  },
+
+  'game.searchBlocks': (params) => {
+    const query = (params.query || '').toLowerCase();
+    const blocks = mockData.blocks.filter(b =>
+      b.name.toLowerCase().includes(query) ||
+      b.tag.toLowerCase().includes(query)
+    ).map(b => ({
+      id: b.id,
+      name: b.name,
+      tag: b.tag,
+      position: b.position,
+      type: b.type,
+      skillCount: b.skills.length
+    }));
+    return { blocks };
+  },
+
+  'game.getSettings': () => {
+    return { settings: { ...mockData.settings, blockCount: mockData.blocks.length } };
+  },
+
+  'game.getBlockTypes': () => {
+    return { blockTypes: mockData.blockTypes };
+  },
+
+  'game.createBlock': (params) => {
+    const newBlock = {
+      id: nextBlockId++,
+      name: params.name || 'New Block',
+      tag: params.tag || 'block',
+      position: params.position || { x: 0, y: 0, z: 0 },
+      rotation: params.rotation || { x: 0, y: 0, z: 0 },
+      scale: params.scale || { x: 1, y: 1, z: 1 },
+      type: params.type || 6,
+      is_physic_enabled: params.is_physic_enabled ?? true,
+      physic: params.physic || { mass: 1, is_static: false, bounce: 0.5, friction: 0.5 },
+      skills: [],
+      surface_colors: {}
+    };
+    mockData.blocks.push(newBlock);
+    return { block: newBlock };
+  },
+
+  'game.updateBlock': (params) => {
+    const block = mockData.blocks.find(b => b.id === params.blockId);
+    if (!block) throw new Error(`Block ${params.blockId} not found`);
+    Object.assign(block, params.updates);
+    return { block };
+  },
+
+  'game.deleteBlock': (params) => {
+    const index = mockData.blocks.findIndex(b => b.id === params.blockId);
+    if (index === -1) throw new Error(`Block ${params.blockId} not found`);
+    mockData.blocks.splice(index, 1);
+    return { success: true };
+  },
+
+  'game.createSkill': (params) => {
+    const block = mockData.blocks.find(b => b.id === params.blockId);
+    if (!block) throw new Error(`Block ${params.blockId} not found`);
+
+    const newSkill = {
+      skill_id: 'skill-' + Date.now(),
+      skill_name: params.skill.skill_name || 'New Skill',
+      enabled: params.skill.enabled ?? true,
+      description: params.skill.description || '',
+      trigger_type: params.skill.trigger_type || 'on_start',
+      trigger_config: params.skill.trigger_config || {},
+      command_script: params.skill.command_script || ''
+    };
+    block.skills.push(newSkill);
+    return { skill: newSkill };
+  },
+
+  'game.updateSkill': (params) => {
+    const block = mockData.blocks.find(b => b.id === params.blockId);
+    if (!block) throw new Error(`Block ${params.blockId} not found`);
+
+    const skill = block.skills.find(s => s.skill_id === params.skillId);
+    if (!skill) throw new Error(`Skill ${params.skillId} not found`);
+
+    Object.assign(skill, params.updates);
+    return { skill };
+  },
+
+  'game.deleteSkill': (params) => {
+    const block = mockData.blocks.find(b => b.id === params.blockId);
+    if (!block) throw new Error(`Block ${params.blockId} not found`);
+
+    const index = block.skills.findIndex(s => s.skill_id === params.skillId);
+    if (index === -1) throw new Error(`Skill ${params.skillId} not found`);
+
+    block.skills.splice(index, 1);
+    return { success: true };
+  },
+
+  'game.submitPlan': (params) => {
+    return new Promise((resolve) => {
+      pendingPlan = { params, resolve };
+      showPlanModal(params);
+    });
+  },
+
+  'game.askUser': (params) => {
+    return new Promise((resolve) => {
+      pendingAsk = { params, resolve };
+      showAskModal(params);
+    });
+  }
+};
+
+// ==================== Plan Modal ====================
+function showPlanModal(plan) {
+  document.getElementById('planTitle').textContent = plan.title;
+
+  let html = `<p><strong>Summary:</strong> ${escapeHtml(plan.summary)}</p>`;
+  html += '<h4 style="margin-top: 12px;">Steps:</h4>';
+  plan.steps.forEach((step, i) => {
+    html += `<div class="plan-step"><span class="step-id">${i + 1}. ${step.id}</span><br>${escapeHtml(step.description)}</div>`;
+  });
+
+  document.getElementById('planBody').innerHTML = html;
+  document.getElementById('planModal').classList.add('open');
+}
+
+function approvePlan() {
+  if (pendingPlan) {
+    pendingPlan.resolve({ approved: true, planId: 'plan-' + Date.now() });
+    pendingPlan = null;
+  }
+  document.getElementById('planModal').classList.remove('open');
+}
+
+function rejectPlan() {
+  if (pendingPlan) {
+    pendingPlan.resolve({ approved: false, planId: 'plan-' + Date.now(), feedback: 'User rejected the plan' });
+    pendingPlan = null;
+  }
+  document.getElementById('planModal').classList.remove('open');
+}
+
+// ==================== Ask Modal ====================
+function showAskModal(params) {
+  const title = params.title || 'Questions from Assistant';
+  document.getElementById('askTitle').textContent = title;
+
+  let html = '';
+  params.questions.forEach((q, index) => {
+    html += `<div class="question-group" data-question-id="${q.id}" data-question-type="${q.type}">`;
+    html += `<div class="question-label">${index + 1}. ${escapeHtml(q.question)}`;
+    if (q.required !== false) html += ' <span class="required">*</span>';
+    html += '</div>';
+    if (q.description) {
+      html += `<div class="question-desc">${escapeHtml(q.description)}</div>`;
+    }
+    html += renderQuestionInput(q);
+    html += '</div>';
+  });
+
+  document.getElementById('askBody').innerHTML = html;
+  document.getElementById('askModal').classList.add('open');
+}
+
+function renderQuestionInput(q) {
+  switch (q.type) {
+    case 'single_choice':
+      return renderSingleChoice(q);
+    case 'multiple_choice':
+      return renderMultipleChoice(q);
+    case 'text':
+      return renderTextInput(q);
+    case 'number':
+      return renderNumberInput(q);
+    case 'confirm':
+      return renderConfirm(q);
+    default:
+      return '<div>Unsupported question type</div>';
+  }
+}
+
+function renderSingleChoice(q) {
+  let html = '<div class="options">';
+  (q.options || []).forEach(opt => {
+    html += `
+      <label class="option-item">
+        <input type="radio" name="q_${q.id}" value="${escapeHtml(opt.value)}">
+        <div class="option-content">
+          <div class="option-label">${escapeHtml(opt.label)}</div>
+          ${opt.description ? `<div class="option-desc">${escapeHtml(opt.description)}</div>` : ''}
+        </div>
+      </label>
+    `;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderMultipleChoice(q) {
+  let html = '<div class="options">';
+  (q.options || []).forEach(opt => {
+    html += `
+      <label class="option-item">
+        <input type="checkbox" name="q_${q.id}" value="${escapeHtml(opt.value)}">
+        <div class="option-content">
+          <div class="option-label">${escapeHtml(opt.label)}</div>
+          ${opt.description ? `<div class="option-desc">${escapeHtml(opt.description)}</div>` : ''}
+        </div>
+      </label>
+    `;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderTextInput(q) {
+  const maxLength = q.maxLength ? `maxlength="${q.maxLength}"` : '';
+  const placeholder = q.placeholder || 'Enter your answer...';
+  return `<input type="text" class="text-input" name="q_${q.id}" placeholder="${escapeHtml(placeholder)}" ${maxLength}>`;
+}
+
+function renderNumberInput(q) {
+  const min = q.min !== undefined ? `min="${q.min}"` : '';
+  const max = q.max !== undefined ? `max="${q.max}"` : '';
+  const step = q.step !== undefined ? `step="${q.step}"` : '';
+  return `<input type="number" class="number-input" name="q_${q.id}" placeholder="Enter a number" ${min} ${max} ${step}>`;
+}
+
+function renderConfirm(q) {
+  return `
+    <div class="confirm-buttons">
+      <button type="button" class="confirm-btn yes" data-value="true" onclick="selectConfirm(this)">Yes</button>
+      <button type="button" class="confirm-btn no" data-value="false" onclick="selectConfirm(this)">No</button>
+    </div>
+    <input type="hidden" name="q_${q.id}" value="">
+  `;
+}
+
+function selectConfirm(btn) {
+  const container = btn.parentElement;
+  container.querySelectorAll('.confirm-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  const hiddenInput = container.nextElementSibling;
+  hiddenInput.value = btn.dataset.value;
+}
+
+function collectAnswers() {
+  if (!pendingAsk) return [];
+
+  const answers = [];
+  pendingAsk.params.questions.forEach(q => {
+    const group = document.querySelector(`[data-question-id="${q.id}"]`);
+    if (!group) return;
+
+    let value;
+    switch (q.type) {
+      case 'single_choice': {
+        const selected = group.querySelector(`input[name="q_${q.id}"]:checked`);
+        value = selected ? selected.value : null;
+        break;
+      }
+      case 'multiple_choice': {
+        const checked = group.querySelectorAll(`input[name="q_${q.id}"]:checked`);
+        value = Array.from(checked).map(cb => cb.value);
+        break;
+      }
+      case 'text': {
+        const input = group.querySelector(`input[name="q_${q.id}"]`);
+        value = input ? input.value : '';
+        break;
+      }
+      case 'number': {
+        const input = group.querySelector(`input[name="q_${q.id}"]`);
+        value = input && input.value !== '' ? parseFloat(input.value) : null;
+        break;
+      }
+      case 'confirm': {
+        const input = group.querySelector(`input[name="q_${q.id}"]`);
+        value = input && input.value !== '' ? input.value === 'true' : null;
+        break;
+      }
+    }
+
+    if (value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
+      answers.push({ questionId: q.id, value });
+    }
+  });
+
+  return answers;
+}
+
+function submitAsk() {
+  if (!pendingAsk) return;
+
+  const answers = collectAnswers();
+  pendingAsk.resolve({ answered: true, answers });
+  pendingAsk = null;
+  document.getElementById('askModal').classList.remove('open');
+}
+
+function cancelAsk() {
+  if (pendingAsk) {
+    pendingAsk.resolve({ answered: false, answers: [] });
+    pendingAsk = null;
+  }
+  document.getElementById('askModal').classList.remove('open');
+}
+
+// ==================== Chat ====================
+
+/**
+ * Streaming message renderer - interleaves text and tool calls in order
+ */
+class StreamingMessageRenderer {
+  constructor() {
+    this.container = null;
+    this.currentTextSegment = null;
+    this.currentText = '';
+    this.toolCalls = new Map();
+  }
+
+  create() {
+    const messages = document.getElementById('messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message assistant';
+    msgDiv.innerHTML = `
+      <div class="label">Assistant</div>
+      <div class="content"></div>
+    `;
+    messages.appendChild(msgDiv);
+    this.container = msgDiv.querySelector('.content');
+    this.scrollToBottom();
+    return msgDiv;
+  }
+
+  scrollToBottom() {
+    const messages = document.getElementById('messages');
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  // Add text delta - accumulates in current text segment
+  addTextDelta(text) {
+    if (!this.currentTextSegment) {
+      // Create new text segment
+      this.currentTextSegment = document.createElement('div');
+      this.currentTextSegment.className = 'text-segment streaming';
+      this.container.appendChild(this.currentTextSegment);
+      this.currentText = '';
+    }
+    this.currentText += text;
+    this.currentTextSegment.textContent = this.currentText;
+    this.scrollToBottom();
+  }
+
+  // Finalize current text segment (called before tool call)
+  finalizeTextSegment() {
+    if (this.currentTextSegment) {
+      this.currentTextSegment.classList.remove('streaming');
+      this.currentTextSegment = null;
+      this.currentText = '';
+    }
+  }
+
+  // Add tool call - finalizes text and adds tool call element
+  addToolCall(toolCallId, toolName, args) {
+    this.finalizeTextSegment();
+
+    const callDiv = document.createElement('div');
+    callDiv.className = 'tool-call inline';
+    callDiv.dataset.id = toolCallId;
+    callDiv.innerHTML = `
+      <div class="tool-call-header" onclick="toggleToolCall(this)">
+        <span class="tool-icon">⚙️</span>
+        <span class="tool-name">${escapeHtml(toolName)}</span>
+        <span class="tool-status">executing...</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="tool-call-body">
+        <pre><strong>Args:</strong>\n${JSON.stringify(args, null, 2)}</pre>
+        <pre class="result"><strong>Result:</strong>\n<em>Waiting...</em></pre>
+      </div>
+    `;
+    this.container.appendChild(callDiv);
+
+    this.toolCalls.set(toolCallId, { toolCallId, toolName, args, element: callDiv });
+    this.scrollToBottom();
+  }
+
+  // Update tool call with result
+  addToolResult(toolCallId, toolName, result) {
+    const tc = this.toolCalls.get(toolCallId);
+    if (tc) {
+      tc.result = result;
+      const resultPre = tc.element.querySelector('.result');
+      resultPre.innerHTML = `<strong>Result:</strong>\n${JSON.stringify(result, null, 2)}`;
+
+      const status = tc.element.querySelector('.tool-status');
+      status.textContent = 'done';
+      status.classList.add('done');
+    }
+    this.scrollToBottom();
+  }
+
+  // Finalize the entire message
+  finalize() {
+    this.finalizeTextSegment();
+  }
+
+  // Add error message
+  addError(error) {
+    this.finalizeTextSegment();
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-segment';
+    errorDiv.textContent = `Error: ${error}`;
+    this.container.appendChild(errorDiv);
+    this.scrollToBottom();
+  }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const message = input.value.trim();
+  if (!message || !sessionId) return;
+
+  input.value = '';
+  addMessage('user', message);
+
+  const serverUrl = document.getElementById('serverUrl').value;
+
+  try {
+    document.getElementById('sendBtn').disabled = true;
+    document.getElementById('chatInput').disabled = true;
+
+    log('info', '', 'Sending chat message (streaming)...');
+
+    // Create streaming message renderer
+    const renderer = new StreamingMessageRenderer();
+    renderer.create();
+
+    const response = await fetch(`${serverUrl}/api/game/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, message })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          continue; // Skip event type lines
+        }
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.text !== undefined && !data.toolCallId) {
+              // text-delta - add to current text segment
+              renderer.addTextDelta(data.text);
+              log('info', '', `Text: "${data.text.substring(0, 50)}..."`);
+            } else if (data.toolName && data.args !== undefined && data.result === undefined) {
+              // tool-call - finalize text, add tool call
+              renderer.addToolCall(data.toolCallId, data.toolName, data.args);
+              log('info', '', `Tool call: ${data.toolName}`);
+            } else if (data.toolCallId && data.result !== undefined) {
+              // tool-result - update tool call with result
+              renderer.addToolResult(data.toolCallId, data.toolName, data.result);
+              log('info', '', `Tool result: ${data.toolName}`);
+            } else if (data.finishReason) {
+              // step or final finish
+              log('info', '', `Finish: ${data.finishReason}`);
+            } else if (data.complete) {
+              // stream complete
+              log('info', '', 'Stream complete');
+            } else if (data.error) {
+              // error
+              log('error', '', `Error: ${data.error}`);
+              renderer.addError(data.error);
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+    }
+
+    renderer.finalize();
+    log('info', '', `Chat completed (${renderer.toolCalls.size} tool calls)`);
+
+  } catch (error) {
+    log('error', '', `Chat error: ${error.message}`);
+    addMessage('assistant', `Error: ${error.message}`);
+  } finally {
+    document.getElementById('sendBtn').disabled = false;
+    document.getElementById('chatInput').disabled = false;
+    document.getElementById('chatInput').focus();
+  }
+}
+
+// ==================== Init ====================
+document.addEventListener('DOMContentLoaded', () => {
+  log('info', '', 'Demo page loaded. Click "Connect" to start.');
+});
+</script>
+</body>
+</html>

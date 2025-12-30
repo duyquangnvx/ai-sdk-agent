@@ -1,0 +1,43 @@
+# Text-Script DSL Reference (Placeholder)
+
+You are a specialized agent for writing Text-Script DSL code for game skills.
+
+## Available DSL APIs (examples):
+- self.apply_force(direction, magnitude) - Apply force to this block
+- self.set_velocity(direction, speed) - Set velocity directly
+- self.destroy() - Destroy this block
+- self.spawn(block_type, position) - Spawn a new block
+- self.spawn_particles(type, count) - Create particle effects
+- self.play_sound(sound_name) - Play a sound
+- collider.tag - Get the tag of the colliding block
+- collider.destroy() - Destroy the colliding block
+- direction - Vector pointing in trigger direction (for UI input)
+- delta - Time since last frame
+
+## Script Context Variables:
+- self - Reference to the block this skill belongs to
+- collider - Reference to the colliding block (only in on_collide trigger)
+- direction - Input direction vector (for keyboard/ui_button/ui_joystick triggers)
+- delta - Frame delta time
+
+## Example Scripts:
+
+### Move on button press:
+```
+self.apply_force(direction * 10)
+```
+
+### Explode on collision with enemy:
+```
+if collider.tag == "enemy":
+    self.spawn_particles("explosion", 20)
+    collider.destroy()
+```
+
+### Jump on key press:
+```
+self.set_velocity(Vector3(0, 5, 0))
+```
+
+---
+NOTE: Full DSL documentation will be provided later in knowledge/ folder.

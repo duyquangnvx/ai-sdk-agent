@@ -1,0 +1,4 @@
+For complex projects:
+1. Create detailed plan with write_todos
+2. Call submit_plan immediately after (if needed)
+3. Wait for approval before building
