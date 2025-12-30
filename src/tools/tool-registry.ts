@@ -1,4 +1,4 @@
-import type { CoreTool } from '@ai-sdk/provider-utils';
+import type { Tool } from 'ai';
 import type {
   ToolRegistrationOptions,
   ToolPermissionConfig,
@@ -38,7 +38,7 @@ export class ToolRegistry {
   /**
    * Register multiple tools at once
    */
-  registerMany(toolsMap: Record<string, CoreTool>, defaults?: Partial<ToolRegistrationOptions>): void {
+  registerMany(toolsMap: Record<string, Tool>, defaults?: Partial<ToolRegistrationOptions>): void {
     for (const [name, tool] of Object.entries(toolsMap)) {
       this.register({
         name,
@@ -67,7 +67,7 @@ export class ToolRegistry {
   /**
    * Get a tool by name
    */
-  get(name: string): CoreTool | undefined {
+  get(name: string): Tool | undefined {
     return this.tools.get(name)?.tool;
   }
 
@@ -81,8 +81,8 @@ export class ToolRegistry {
   /**
    * Get all registered tools as a record
    */
-  getAll(): Record<string, CoreTool> {
-    const result: Record<string, CoreTool> = {};
+  getAll(): Record<string, Tool> {
+    const result: Record<string, Tool> = {};
     for (const [name, options] of this.tools) {
       result[name] = options.tool;
     }
@@ -99,8 +99,8 @@ export class ToolRegistry {
   /**
    * Get tools filtered for sub-agent access
    */
-  getToolsForSubAgent(): Record<string, CoreTool> {
-    const result: Record<string, CoreTool> = {};
+  getToolsForSubAgent(): Record<string, Tool> {
+    const result: Record<string, Tool> = {};
     for (const [name, options] of this.tools) {
       if (options.availableToSubAgents) {
         result[name] = options.tool;
@@ -112,8 +112,8 @@ export class ToolRegistry {
   /**
    * Get tools by category
    */
-  getByCategory(category: ToolRegistrationOptions['category']): Record<string, CoreTool> {
-    const result: Record<string, CoreTool> = {};
+  getByCategory(category: ToolRegistrationOptions['category']): Record<string, Tool> {
+    const result: Record<string, Tool> = {};
     for (const [name, options] of this.tools) {
       if (options.category === category) {
         result[name] = options.tool;
@@ -125,8 +125,8 @@ export class ToolRegistry {
   /**
    * Filter tools by allowed names
    */
-  filterByNames(allowedNames: string[]): Record<string, CoreTool> {
-    const result: Record<string, CoreTool> = {};
+  filterByNames(allowedNames: string[]): Record<string, Tool> {
+    const result: Record<string, Tool> = {};
     for (const name of allowedNames) {
       const options = this.tools.get(name);
       if (options) {

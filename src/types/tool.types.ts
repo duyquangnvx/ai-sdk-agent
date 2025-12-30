@@ -1,4 +1,4 @@
-import type { CoreTool } from '@ai-sdk/provider-utils';
+import type { Tool } from 'ai';
 import type { z } from 'zod';
 
 /**
@@ -9,7 +9,7 @@ export interface ToolRegistrationOptions {
   name: string;
 
   /** Tool definition from AI SDK */
-  tool: CoreTool;
+  tool: Tool;
 
   /** Required permissions for this tool */
   permissions?: string[];

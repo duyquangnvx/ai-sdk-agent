@@ -1,5 +1,5 @@
 import { tool } from 'ai';
-import type { CoreTool } from 'ai';
+import type { Tool } from 'ai';
 import type { z } from 'zod';
 import type { ToolRegistrationOptions, ToolBuilderConfig } from '../types/tool.types.js';
 
@@ -67,9 +67,9 @@ export class ToolBuilder<TInput = unknown, TOutput = unknown> {
   }
 
   /**
-   * Build the tool (AI SDK CoreTool)
+   * Build the tool (AI SDK Tool)
    */
-  buildTool(): CoreTool {
+  buildTool(): Tool {
     this.validate();
 
     return tool({
@@ -138,9 +138,9 @@ export function createTool<TInput, TOutput>(
     name: config.name,
     tool: tool({
       description: config.description,
-      inputSchema: config.schema,
-      execute: config.execute,
-    }),
+      inputSchema: config.schema as z.ZodSchema,
+      execute: config.execute as (input: unknown) => Promise<unknown>,
+    }) as Tool,
     permissions: config.permissions,
     availableToSubAgents: config.availableToSubAgents ?? true,
     category: config.category ?? 'custom',

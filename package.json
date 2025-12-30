@@ -36,12 +36,13 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "ai": "^6.0.0",
+    "@ai-sdk/google": "^3.0.1",
+    "ai": "^6.0.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^1.0.0",
-    "@ai-sdk/openai": "^1.0.0",
+    "@ai-sdk/anthropic": "^3.0.1",
+    "@ai-sdk/openai": "^3.0.1",
     "@types/node": "^20.17.0",
     "rimraf": "^6.0.1",
     "tsup": "^8.3.5",

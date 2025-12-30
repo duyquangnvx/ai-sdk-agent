@@ -1,5 +1,4 @@
-import { generateText, streamText, type LanguageModel, type ModelMessage } from 'ai';
-import type { CoreTool } from '@ai-sdk/provider-utils';
+import { generateText, streamText, type LanguageModel, type ModelMessage, type Tool } from 'ai';
 import { randomUUID } from 'crypto';
 import type {
   AgentConfig,
@@ -426,15 +425,14 @@ export class Agent<TCallOptions = unknown> {
           system: systemPrompt,
           messages,
           tools: Object.keys(tools).length > 0 ? tools : undefined,
-          maxSteps: 1, // We handle the loop ourselves
           abortSignal: signal,
         });
 
         // Update usage
         if (response.usage) {
-          this.usage.inputTokens += response.usage.inputTokens;
-          this.usage.outputTokens += response.usage.outputTokens;
-          this.usage.totalTokens += response.usage.inputTokens + response.usage.outputTokens;
+          this.usage.inputTokens += response.usage.inputTokens ?? 0;
+          this.usage.outputTokens += response.usage.outputTokens ?? 0;
+          this.usage.totalTokens += (response.usage.inputTokens ?? 0) + (response.usage.outputTokens ?? 0);
         }
 
         // Process response
@@ -442,7 +440,7 @@ export class Agent<TCallOptions = unknown> {
 
         if (hasToolCalls) {
           // Record tool call steps
-          const toolResults = response.toolResults as Array<{ toolCallId: string; result: unknown }> | undefined;
+          const toolResults = response.toolResults as Array<{ toolCallId: string; output: unknown }> | undefined;
 
           for (const toolCall of response.toolCalls) {
             this.usage.toolCalls++;
@@ -450,8 +448,8 @@ export class Agent<TCallOptions = unknown> {
             const step: AgentStep = {
               stepNumber: currentStep,
               type: 'tool-call',
-              input: toolCall.args,
-              output: toolResults?.find((r) => r.toolCallId === toolCall.toolCallId)?.result,
+              input: toolCall.input,
+              output: toolResults?.find((r) => r.toolCallId === toolCall.toolCallId)?.output,
               timestamp: new Date(),
               duration: Date.now() - stepStart,
               toolName: toolCall.toolName,
@@ -536,7 +534,6 @@ export class Agent<TCallOptions = unknown> {
         system: systemPrompt,
         messages,
         tools: Object.keys(tools).length > 0 ? tools : undefined,
-        maxSteps: 1,
         abortSignal: signal,
       });
 
@@ -554,13 +551,13 @@ export class Agent<TCallOptions = unknown> {
       ]);
 
       if (usage) {
-        this.usage.inputTokens += usage.inputTokens;
-        this.usage.outputTokens += usage.outputTokens;
-        this.usage.totalTokens += usage.inputTokens + usage.outputTokens;
+        this.usage.inputTokens += usage.inputTokens ?? 0;
+        this.usage.outputTokens += usage.outputTokens ?? 0;
+        this.usage.totalTokens += (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
       }
 
       if (toolCallsResult && toolCallsResult.length > 0) {
-        const toolResults = toolResultsResult as Array<{ toolCallId: string; result: unknown }> | undefined;
+        const toolResults = toolResultsResult as Array<{ toolCallId: string; output: unknown }> | undefined;
 
         for (const toolCall of toolCallsResult) {
           this.usage.toolCalls++;
@@ -568,8 +565,8 @@ export class Agent<TCallOptions = unknown> {
           const step: AgentStep = {
             stepNumber: currentStep,
             type: 'tool-call',
-            input: toolCall.args,
-            output: toolResults?.find((r) => r.toolCallId === toolCall.toolCallId)?.result,
+            input: toolCall.input,
+            output: toolResults?.find((r) => r.toolCallId === toolCall.toolCallId)?.output,
             timestamp: new Date(),
             duration: Date.now() - stepStart,
             toolName: toolCall.toolName,
@@ -610,7 +607,7 @@ Focus on completing this specific task and returning results to the parent agent
 Be concise and efficient in your responses.`;
   }
 
-  protected getSubAgentTools(allowedTools?: string[]): Record<string, CoreTool> {
+  protected getSubAgentTools(allowedTools?: string[]): Record<string, Tool> {
     if (allowedTools) {
       return this.toolRegistry.filterByNames(allowedTools);
     }

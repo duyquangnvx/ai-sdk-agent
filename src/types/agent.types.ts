@@ -1,5 +1,4 @@
-import type { LanguageModel, ModelMessage } from 'ai';
-import type { CoreTool } from '@ai-sdk/provider-utils';
+import type { LanguageModel, ModelMessage, Tool } from 'ai';
 import type { z } from 'zod';
 import type { ContextConfig, ConversationHistory } from './context.types.js';
 
@@ -20,7 +19,7 @@ export interface AgentConfig<TCallOptions = unknown> {
   instructions?: string | InstructionsLoader;
 
   /** Tools available to the agent */
-  tools?: Record<string, CoreTool>;
+  tools?: Record<string, Tool>;
 
   /** Context management configuration */
   context?: ContextConfig;
@@ -85,7 +84,7 @@ export type InstructionsLoader = () => Promise<string> | string;
 export type PrepareCallFunction<TCallOptions = unknown> = (params: {
   options?: TCallOptions;
   model: string | LanguageModel;
-  tools?: Record<string, CoreTool>;
+  tools?: Record<string, Tool>;
   systemPrompt?: string;
   maxSteps?: number;
 }) => Promise<Partial<AgentConfig<TCallOptions>>> | Partial<AgentConfig<TCallOptions>>;
