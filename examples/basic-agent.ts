@@ -6,14 +6,14 @@
  */
 
 import { Agent, createTool, InstructionsLoaderUtils } from '../src/index.js';
-import { anthropic } from '@ai-sdk/anthropic';
+import model from './model.js';
 import { z } from 'zod';
 
 // Create an agent with basic configuration
 async function basicExample() {
   const agent = new Agent({
     name: 'basic-assistant',
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: model,
     systemPrompt: 'You are a helpful assistant that can perform calculations.',
 
     // Register custom tools
@@ -60,7 +60,7 @@ async function basicExample() {
 async function instructionsExample() {
   const agent = new Agent({
     name: 'custom-instructions-agent',
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: model,
 
     // Load instructions from file (like CLAUDE.md)
     instructions: InstructionsLoaderUtils.fromFileOrDefault(
@@ -79,7 +79,7 @@ async function instructionsExample() {
 async function dynamicModelExample() {
   const agent = new Agent({
     name: 'dynamic-model-agent',
-    model: anthropic('claude-sonnet-4-20250514'), // Default model
+    model: model, // Default model
 
     // Define call options schema
     callOptionsSchema: z.object({
@@ -91,7 +91,7 @@ async function dynamicModelExample() {
     prepareCall: async ({ options }) => {
       if (options?.priority === 'high' || options?.taskType === 'complex') {
         return {
-          model: anthropic('claude-sonnet-4-20250514'), // Use more capable model
+          model: model, // Use more capable model
           maxSteps: 30,
         };
       }
@@ -115,7 +115,7 @@ async function dynamicModelExample() {
 async function callbacksExample() {
   const agent = new Agent({
     name: 'callback-agent',
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: model,
 
     onStart: async ({ agentId, timestamp }) => {
       console.log(`Agent ${agentId} started at ${timestamp}`);

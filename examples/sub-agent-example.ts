@@ -6,14 +6,14 @@
  */
 
 import { Agent, createTool } from '../src/index.js';
-import { anthropic } from '@ai-sdk/anthropic';
+import model from './model.js';
 import { z } from 'zod';
 
 async function subAgentExample() {
   // Create main agent that can spawn sub-agents
   const agent = new Agent({
     name: 'main-agent',
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: model,
     systemPrompt: `You are a project manager agent.
 When faced with complex research tasks, you can delegate to sub-agents.
 Use sub-agents for tasks that require focused investigation.`,
@@ -96,7 +96,7 @@ Use sub-agents for tasks that require focused investigation.`,
 async function manualSubAgentExample() {
   const agent = new Agent({
     name: 'main-agent',
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: model,
     systemPrompt: 'You are a helpful assistant.',
     canSpawnSubAgents: true,
     tools: {
