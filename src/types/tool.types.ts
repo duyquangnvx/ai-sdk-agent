@@ -1,4 +1,4 @@
-import type { CoreTool } from 'ai';
+import type { CoreTool } from '@ai-sdk/provider-utils';
 import type { z } from 'zod';
 
 /**

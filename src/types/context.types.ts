@@ -1,4 +1,4 @@
-import type { CoreMessage } from 'ai';
+import type { ModelMessage } from 'ai';
 
 /**
  * Context management configuration
@@ -28,7 +28,7 @@ export interface ContextConfig {
  */
 export interface ConversationHistory {
   /** All messages in the conversation */
-  messages: CoreMessage[];
+  messages: ModelMessage[];
 
   /** Estimated token count */
   tokenCount: number;
@@ -48,7 +48,7 @@ export interface ConversationHistory {
  */
 export interface CompactionResult {
   /** Compacted messages */
-  messages: CoreMessage[];
+  messages: ModelMessage[];
 
   /** Original message count before compaction */
   originalCount: number;
@@ -70,9 +70,9 @@ export interface CompactionResult {
  * Custom compactor function type
  */
 export type CompactorFunction = (
-  messages: CoreMessage[],
+  messages: ModelMessage[],
   config: ContextConfig
-) => Promise<CoreMessage[]>;
+) => Promise<ModelMessage[]>;
 
 /**
  * Token counter function type
@@ -84,7 +84,7 @@ export type TokenCounterFunction = (text: string) => number;
  */
 export interface ContextSnapshot {
   /** Current messages */
-  messages: CoreMessage[];
+  messages: ModelMessage[];
 
   /** Token count */
   tokenCount: number;

@@ -1,4 +1,4 @@
-import type { CoreMessage, LanguageModelV1 } from 'ai';
+import type { ModelMessage, LanguageModel } from 'ai';
 import { generateText } from 'ai';
 import type {
   ContextConfig,
@@ -26,9 +26,9 @@ export class ContextManager {
   private config: ContextConfig;
   private history: ConversationHistoryManager;
   private compactionHistory: CompactionResult[] = [];
-  private summaryModel?: LanguageModelV1;
+  private summaryModel?: LanguageModel;
 
-  constructor(config?: ContextConfig, summaryModel?: LanguageModelV1) {
+  constructor(config?: ContextConfig, summaryModel?: LanguageModel) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.history = new ConversationHistoryManager();
     this.summaryModel = summaryModel;
@@ -72,7 +72,7 @@ export class ContextManager {
   /**
    * Add any message
    */
-  addMessage(message: CoreMessage): void {
+  addMessage(message: ModelMessage): void {
     this.history.addMessage(message);
   }
 
@@ -86,7 +86,7 @@ export class ContextManager {
   /**
    * Get all messages
    */
-  getMessages(): CoreMessage[] {
+  getMessages(): ModelMessage[] {
     return this.history.export();
   }
 
@@ -124,7 +124,7 @@ export class ContextManager {
     const originalCount = originalMessages.length;
     const originalTokens = this.history.tokenCount;
 
-    let compactedMessages: CoreMessage[];
+    let compactedMessages: ModelMessage[];
 
     // Use custom compactor if provided
     if (this.config.customCompactor) {
@@ -153,7 +153,7 @@ export class ContextManager {
   /**
    * Apply built-in compaction strategy
    */
-  private async applyCompactionStrategy(messages: CoreMessage[]): Promise<CoreMessage[]> {
+  private async applyCompactionStrategy(messages: ModelMessage[]): Promise<ModelMessage[]> {
     const strategy = this.config.compactStrategy ?? DEFAULT_CONFIG.compactStrategy;
     const preserveSystem = this.config.preserveSystem ?? DEFAULT_CONFIG.preserveSystem;
 
@@ -161,7 +161,7 @@ export class ContextManager {
     const systemMessages = preserveSystem ? messages.filter((m) => m.role === 'system') : [];
     const nonSystemMessages = messages.filter((m) => m.role !== 'system' || !preserveSystem);
 
-    let compactedNonSystem: CoreMessage[];
+    let compactedNonSystem: ModelMessage[];
 
     switch (strategy) {
       case 'summarize':
@@ -184,7 +184,7 @@ export class ContextManager {
   /**
    * Summarize messages using LLM
    */
-  private async summarizeMessages(messages: CoreMessage[]): Promise<CoreMessage[]> {
+  private async summarizeMessages(messages: ModelMessage[]): Promise<ModelMessage[]> {
     if (messages.length <= 2) {
       return messages; // Not enough to summarize
     }
@@ -232,7 +232,7 @@ export class ContextManager {
   /**
    * Truncate older messages
    */
-  private truncateMessages(messages: CoreMessage[]): CoreMessage[] {
+  private truncateMessages(messages: ModelMessage[]): ModelMessage[] {
     // Keep roughly half the messages (most recent)
     const keepCount = Math.max(4, Math.floor(messages.length / 2));
     return messages.slice(-keepCount);
@@ -241,11 +241,11 @@ export class ContextManager {
   /**
    * Sliding window - keep most recent N messages
    */
-  private slidingWindowMessages(messages: CoreMessage[]): CoreMessage[] {
+  private slidingWindowMessages(messages: ModelMessage[]): ModelMessage[] {
     // Calculate how many messages to keep based on target tokens
     const targetTokens = (this.config.maxTokens ?? DEFAULT_CONFIG.maxTokens) * 0.5;
     let tokenCount = 0;
-    const keptMessages: CoreMessage[] = [];
+    const keptMessages: ModelMessage[] = [];
 
     // Work backwards from most recent
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -266,7 +266,7 @@ export class ContextManager {
   /**
    * Estimate tokens for a message
    */
-  private estimateMessageTokens(message: CoreMessage): number {
+  private estimateMessageTokens(message: ModelMessage): number {
     if (typeof message.content === 'string') {
       return Math.ceil(message.content.length / 4);
     }
@@ -309,7 +309,7 @@ export class ContextManager {
   /**
    * Set summary model for summarization strategy
    */
-  setSummaryModel(model: LanguageModelV1): void {
+  setSummaryModel(model: LanguageModel): void {
     this.summaryModel = model;
   }
 }

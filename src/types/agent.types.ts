@@ -1,4 +1,5 @@
-import type { LanguageModelV1, CoreTool, CoreMessage } from 'ai';
+import type { LanguageModel, ModelMessage } from 'ai';
+import type { CoreTool } from '@ai-sdk/provider-utils';
 import type { z } from 'zod';
 import type { ContextConfig, ConversationHistory } from './context.types.js';
 
@@ -6,8 +7,8 @@ import type { ContextConfig, ConversationHistory } from './context.types.js';
  * Core agent configuration
  */
 export interface AgentConfig<TCallOptions = unknown> {
-  /** Model to use - can be string ID or LanguageModelV1 instance */
-  model: string | LanguageModelV1;
+  /** Model to use - can be string ID or LanguageModel instance */
+  model: string | LanguageModel;
 
   /** Agent name for logging and identification */
   name?: string;
@@ -83,7 +84,7 @@ export type InstructionsLoader = () => Promise<string> | string;
  */
 export type PrepareCallFunction<TCallOptions = unknown> = (params: {
   options?: TCallOptions;
-  model: string | LanguageModelV1;
+  model: string | LanguageModel;
   tools?: Record<string, CoreTool>;
   systemPrompt?: string;
   maxSteps?: number;
@@ -293,7 +294,7 @@ export interface ExecuteOptions<TCallOptions = unknown> {
   systemPrompt?: string;
 
   /** Additional context messages to prepend */
-  contextMessages?: CoreMessage[];
+  contextMessages?: ModelMessage[];
 
   /** Override max steps for this execution */
   maxSteps?: number;
@@ -313,7 +314,7 @@ export interface SpawnSubAgentOptions {
   allowedTools?: string[];
 
   /** Override model for sub-agent */
-  model?: string | LanguageModelV1;
+  model?: string | LanguageModel;
 
   /** Override system prompt */
   systemPrompt?: string;

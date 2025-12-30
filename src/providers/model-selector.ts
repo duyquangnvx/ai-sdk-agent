@@ -1,4 +1,4 @@
-import type { LanguageModelV1 } from 'ai';
+import type { LanguageModel } from 'ai';
 
 /**
  * Model selection criteria
@@ -23,7 +23,7 @@ export interface ModelSelectionCriteria {
  */
 export interface ModelOption {
   /** Model instance */
-  model: LanguageModelV1;
+  model: LanguageModel;
   /** Display name */
   name: string;
   /** Provider (anthropic, openai, etc.) */
@@ -68,7 +68,7 @@ export class ModelSelector {
   /**
    * Get a model by ID
    */
-  get(id: string): LanguageModelV1 | undefined {
+  get(id: string): LanguageModel | undefined {
     return this.models.get(id)?.model;
   }
 
@@ -82,7 +82,7 @@ export class ModelSelector {
   /**
    * Get the default model
    */
-  getDefault(): LanguageModelV1 | undefined {
+  getDefault(): LanguageModel | undefined {
     if (!this.defaultModel) return undefined;
     return this.get(this.defaultModel);
   }
@@ -90,7 +90,7 @@ export class ModelSelector {
   /**
    * Select the best model based on criteria
    */
-  select(criteria: ModelSelectionCriteria): LanguageModelV1 {
+  select(criteria: ModelSelectionCriteria): LanguageModel {
     // First, check for models with preferWhen conditions
     for (const [, option] of this.models) {
       if (option.preferWhen?.(criteria)) {
@@ -126,21 +126,21 @@ export class ModelSelector {
   /**
    * Select model for simple/fast tasks
    */
-  selectFast(): LanguageModelV1 {
+  selectFast(): LanguageModel {
     return this.select({ prioritizeSpeed: true, complexity: 2 });
   }
 
   /**
    * Select model for complex tasks
    */
-  selectComplex(): LanguageModelV1 {
+  selectComplex(): LanguageModel {
     return this.select({ complexity: 8 });
   }
 
   /**
    * Select model for cost-effective tasks
    */
-  selectCheap(): LanguageModelV1 {
+  selectCheap(): LanguageModel {
     return this.select({ prioritizeCost: true });
   }
 

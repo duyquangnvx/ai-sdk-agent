@@ -74,7 +74,7 @@ export class ToolBuilder<TInput = unknown, TOutput = unknown> {
 
     return tool({
       description: this.config.description!,
-      parameters: this.config.inputSchema!,
+      inputSchema: this.config.inputSchema!,
       execute: this.config.execute!,
     });
   }
@@ -138,7 +138,7 @@ export function createTool<TInput, TOutput>(
     name: config.name,
     tool: tool({
       description: config.description,
-      parameters: config.schema,
+      inputSchema: config.schema,
       execute: config.execute,
     }),
     permissions: config.permissions,

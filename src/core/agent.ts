@@ -1,4 +1,5 @@
-import { generateText, streamText, type LanguageModelV1, type CoreMessage, type CoreTool } from 'ai';
+import { generateText, streamText, type LanguageModel, type ModelMessage } from 'ai';
+import type { CoreTool } from '@ai-sdk/provider-utils';
 import { randomUUID } from 'crypto';
 import type {
   AgentConfig,
@@ -41,7 +42,7 @@ export class Agent<TCallOptions = unknown> {
   protected startedAt?: Date;
   protected completedAt?: Date;
   protected activeSubAgents: Set<string> = new Set();
-  protected model: LanguageModelV1;
+  protected model: LanguageModel;
 
   constructor(config: AgentConfig<TCallOptions>) {
     this.id = randomUUID();
@@ -344,10 +345,10 @@ export class Agent<TCallOptions = unknown> {
     };
   }
 
-  protected resolveModel(model: string | LanguageModelV1): LanguageModelV1 {
+  protected resolveModel(model: string | LanguageModel): LanguageModel {
     if (typeof model === 'string') {
       throw new Error(
-        `String model IDs are not directly supported. Please pass a LanguageModelV1 instance from @ai-sdk/anthropic, @ai-sdk/openai, or another provider. Example: anthropic('claude-sonnet-4-20250514')`
+        `String model IDs are not directly supported. Please pass a LanguageModel instance from @ai-sdk/anthropic, @ai-sdk/openai, or another provider. Example: anthropic('claude-sonnet-4-20250514')`
       );
     }
     return model;
@@ -431,9 +432,9 @@ export class Agent<TCallOptions = unknown> {
 
         // Update usage
         if (response.usage) {
-          this.usage.inputTokens += response.usage.promptTokens;
-          this.usage.outputTokens += response.usage.completionTokens;
-          this.usage.totalTokens += response.usage.totalTokens;
+          this.usage.inputTokens += response.usage.inputTokens;
+          this.usage.outputTokens += response.usage.outputTokens;
+          this.usage.totalTokens += response.usage.inputTokens + response.usage.outputTokens;
         }
 
         // Process response
@@ -465,7 +466,7 @@ export class Agent<TCallOptions = unknown> {
           this.contextManager.addMessage({
             role: 'assistant',
             content: response.text || '',
-          } as CoreMessage);
+          } as ModelMessage);
 
           // Continue the loop
           lastResult = toolResults;
@@ -553,9 +554,9 @@ export class Agent<TCallOptions = unknown> {
       ]);
 
       if (usage) {
-        this.usage.inputTokens += usage.promptTokens;
-        this.usage.outputTokens += usage.completionTokens;
-        this.usage.totalTokens += usage.totalTokens;
+        this.usage.inputTokens += usage.inputTokens;
+        this.usage.outputTokens += usage.outputTokens;
+        this.usage.totalTokens += usage.inputTokens + usage.outputTokens;
       }
 
       if (toolCallsResult && toolCallsResult.length > 0) {
@@ -581,7 +582,7 @@ export class Agent<TCallOptions = unknown> {
         this.contextManager.addMessage({
           role: 'assistant',
           content: fullText || '',
-        } as CoreMessage);
+        } as ModelMessage);
       } else {
         const step: AgentStep = {
           stepNumber: currentStep,

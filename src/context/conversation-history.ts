@@ -1,4 +1,4 @@
-import type { CoreMessage } from 'ai';
+import type { ModelMessage } from 'ai';
 import type { ConversationHistory as IConversationHistory } from '../types/context.types.js';
 
 /**
@@ -12,7 +12,7 @@ function estimateTokens(text: string): number {
 /**
  * Estimate tokens for a message
  */
-function estimateMessageTokens(message: CoreMessage): number {
+function estimateMessageTokens(message: ModelMessage): number {
   if (typeof message.content === 'string') {
     return estimateTokens(message.content);
   }
@@ -32,19 +32,19 @@ function estimateMessageTokens(message: CoreMessage): number {
  * Tracks messages and token usage
  */
 export class ConversationHistoryManager implements IConversationHistory {
-  private _messages: CoreMessage[] = [];
+  private _messages: ModelMessage[] = [];
   private _tokenCount: number = 0;
   private _compacted: boolean = false;
   private _originalMessageCount?: number;
   private _lastCompactedAt?: Date;
 
-  constructor(initialMessages?: CoreMessage[]) {
+  constructor(initialMessages?: ModelMessage[]) {
     if (initialMessages) {
       initialMessages.forEach((msg) => this.addMessage(msg));
     }
   }
 
-  get messages(): CoreMessage[] {
+  get messages(): ModelMessage[] {
     return [...this._messages];
   }
 
@@ -67,7 +67,7 @@ export class ConversationHistoryManager implements IConversationHistory {
   /**
    * Add a message to the history
    */
-  addMessage(message: CoreMessage): void {
+  addMessage(message: ModelMessage): void {
     this._messages.push(message);
     this._tokenCount += estimateMessageTokens(message);
   }
@@ -96,21 +96,21 @@ export class ConversationHistoryManager implements IConversationHistory {
   /**
    * Get recent messages
    */
-  getRecent(count: number): CoreMessage[] {
+  getRecent(count: number): ModelMessage[] {
     return this._messages.slice(-count);
   }
 
   /**
    * Get all system messages
    */
-  getSystemMessages(): CoreMessage[] {
+  getSystemMessages(): ModelMessage[] {
     return this._messages.filter((msg) => msg.role === 'system');
   }
 
   /**
    * Get all non-system messages
    */
-  getNonSystemMessages(): CoreMessage[] {
+  getNonSystemMessages(): ModelMessage[] {
     return this._messages.filter((msg) => msg.role !== 'system');
   }
 
@@ -127,14 +127,14 @@ export class ConversationHistoryManager implements IConversationHistory {
   /**
    * Export messages (creates a copy)
    */
-  export(): CoreMessage[] {
+  export(): ModelMessage[] {
     return [...this._messages];
   }
 
   /**
    * Replace all messages (used after compaction)
    */
-  replaceMessages(messages: CoreMessage[], wasCompacted: boolean = false): void {
+  replaceMessages(messages: ModelMessage[], wasCompacted: boolean = false): void {
     if (wasCompacted) {
       this._originalMessageCount = this._messages.length;
       this._compacted = true;
