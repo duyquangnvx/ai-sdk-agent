@@ -440,7 +440,7 @@ export class Agent<TCallOptions = unknown> {
 
         if (hasToolCalls) {
           // Record tool call steps
-          const toolResults = response.toolResults as Array<{ toolCallId: string; output: unknown }> | undefined;
+          const toolResults = response.toolResults as Array<{ toolCallId: string; toolName: string; output: unknown }> | undefined;
 
           for (const toolCall of response.toolCalls) {
             this.usage.toolCalls++;
@@ -460,11 +460,10 @@ export class Agent<TCallOptions = unknown> {
             currentStep++;
           }
 
-          // Add assistant message with tool calls to context
-          this.contextManager.addMessage({
-            role: 'assistant',
-            content: response.text || '',
-          } as ModelMessage);
+          // Add response messages to context (properly formatted by AI SDK)
+          for (const msg of response.response.messages) {
+            this.contextManager.addMessage(msg as ModelMessage);
+          }
 
           // Continue the loop
           lastResult = toolResults;
@@ -557,7 +556,7 @@ export class Agent<TCallOptions = unknown> {
       }
 
       if (toolCallsResult && toolCallsResult.length > 0) {
-        const toolResults = toolResultsResult as Array<{ toolCallId: string; output: unknown }> | undefined;
+        const toolResults = toolResultsResult as Array<{ toolCallId: string; toolName: string; output: unknown }> | undefined;
 
         for (const toolCall of toolCallsResult) {
           this.usage.toolCalls++;
@@ -576,10 +575,11 @@ export class Agent<TCallOptions = unknown> {
           currentStep++;
         }
 
-        this.contextManager.addMessage({
-          role: 'assistant',
-          content: fullText || '',
-        } as ModelMessage);
+        // Add response messages to context (properly formatted by AI SDK)
+        const responseObj = await response.response;
+        for (const msg of responseObj.messages) {
+          this.contextManager.addMessage(msg as ModelMessage);
+        }
       } else {
         const step: AgentStep = {
           stepNumber: currentStep,

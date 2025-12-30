@@ -22,7 +22,10 @@
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "example": "tsx examples/basic-agent.ts",
+    "example:basic": "tsx examples/basic-agent.ts",
+    "example:sub-agent": "tsx examples/sub-agent-example.ts"
   },
   "keywords": [
     "ai",
@@ -46,6 +49,7 @@
     "@types/node": "^20.17.0",
     "rimraf": "^6.0.1",
     "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
