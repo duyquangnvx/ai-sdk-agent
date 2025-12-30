@@ -74,6 +74,10 @@ export type {
   AgentState,
   ExecuteOptions,
   SpawnSubAgentOptions,
+  // Streaming types
+  TextChunkEvent,
+  StepCompleteEvent,
+  StreamEvent,
 } from './types/agent.types.js';
 
 export type {

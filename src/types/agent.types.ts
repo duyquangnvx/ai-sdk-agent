@@ -300,7 +300,32 @@ export interface ExecuteOptions<TCallOptions = unknown> {
 
   /** Signal for cancellation */
   signal?: AbortSignal;
+
+  /** Callback for receiving text chunks during streaming */
+  onTextChunk?: (chunk: string, accumulated: string) => void;
 }
+
+/**
+ * Text chunk event during streaming
+ */
+export interface TextChunkEvent {
+  type: 'text-chunk';
+  chunk: string;
+  accumulated: string;
+}
+
+/**
+ * Step complete event during streaming
+ */
+export interface StepCompleteEvent {
+  type: 'step-complete';
+  step: AgentStep;
+}
+
+/**
+ * Stream event - can be either a text chunk or a completed step
+ */
+export type StreamEvent = TextChunkEvent | StepCompleteEvent;
 
 /**
  * Options for spawning sub-agents

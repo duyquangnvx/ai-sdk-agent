@@ -8,6 +8,7 @@ import type {
   AgentUsageStats,
   ExecuteOptions,
   SpawnSubAgentOptions,
+  StreamEvent,
 } from '../types/agent.types.js';
 import type { ConversationHistory } from '../types/context.types.js';
 import { ContextManager } from '../context/context-manager.js';
@@ -139,11 +140,12 @@ export class Agent<TCallOptions = unknown> {
 
   /**
    * Stream agent execution
+   * Yields StreamEvent which can be either text chunks or completed steps
    */
   async *stream(
     input: string,
     options?: ExecuteOptions<TCallOptions>
-  ): AsyncGenerator<AgentStep, AgentResult> {
+  ): AsyncGenerator<StreamEvent, AgentResult> {
     this.startedAt = new Date();
     this.status = 'running';
     this.steps = [];
@@ -168,9 +170,16 @@ export class Agent<TCallOptions = unknown> {
       this.contextManager.addUserMessage(input);
 
       // Execute with streaming
-      for await (const step of this.executeLoopStreaming(systemPrompt, execConfig, options?.signal)) {
-        this.steps.push(step);
-        yield step;
+      for await (const event of this.executeLoopStreaming(
+        systemPrompt,
+        execConfig,
+        options?.signal,
+        options?.onTextChunk
+      )) {
+        if (event.type === 'step-complete') {
+          this.steps.push(event.step);
+        }
+        yield event;
       }
 
       this.status = 'completed';
@@ -510,8 +519,9 @@ export class Agent<TCallOptions = unknown> {
   protected async *executeLoopStreaming(
     systemPrompt: string,
     execConfig: Partial<AgentConfig<TCallOptions>>,
-    signal?: AbortSignal
-  ): AsyncGenerator<AgentStep> {
+    signal?: AbortSignal,
+    onTextChunk?: (chunk: string, accumulated: string) => void
+  ): AsyncGenerator<StreamEvent> {
     const maxSteps = execConfig.maxSteps ?? this.config.maxSteps ?? 20;
     let currentStep = 0;
 
@@ -538,8 +548,19 @@ export class Agent<TCallOptions = unknown> {
 
       let fullText = '';
 
+      // Stream text chunks as they arrive
       for await (const chunk of response.textStream) {
         fullText += chunk;
+
+        // Yield text chunk event
+        yield {
+          type: 'text-chunk' as const,
+          chunk,
+          accumulated: fullText,
+        };
+
+        // Call onTextChunk callback if provided
+        onTextChunk?.(chunk, fullText);
       }
 
       // Get final results - these are promises that need to be awaited
@@ -571,7 +592,7 @@ export class Agent<TCallOptions = unknown> {
             toolName: toolCall.toolName,
           };
 
-          yield step;
+          yield { type: 'step-complete' as const, step };
           currentStep++;
         }
 
@@ -590,7 +611,7 @@ export class Agent<TCallOptions = unknown> {
           duration: Date.now() - stepStart,
         };
 
-        yield step;
+        yield { type: 'step-complete' as const, step };
         this.contextManager.addAssistantMessage(fullText);
         break;
       }

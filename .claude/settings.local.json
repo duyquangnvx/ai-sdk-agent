@@ -12,7 +12,8 @@
       "Bash(npm run:*)",
       "Bash(set:*)",
       "Bash($env:DEBUG_AGENT=\"1\")",
-      "Bash(npx tsx examples/basic-agent.ts)"
+      "Bash(npx tsx examples/basic-agent.ts)",
+      "Bash(npx tsx:*)"
     ]
   }
 }
