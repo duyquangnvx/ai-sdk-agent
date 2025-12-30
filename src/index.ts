@@ -56,6 +56,9 @@ export {
 
 // Type exports
 export type {
+  // Re-exported AI SDK types (convenience)
+  LanguageModel,
+  ModelMessage,
   // Agent types
   AgentConfig,
   SubAgentConfig,
@@ -92,6 +95,8 @@ export type {
 
 export type {
   // Tool types
+  Tool,
+  ToolApprovalConfig,
   ToolRegistrationOptions,
   ToolPermissionConfig,
   ToolApprovalFunction,

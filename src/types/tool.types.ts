@@ -2,6 +2,20 @@ import type { Tool } from 'ai';
 import type { z } from 'zod';
 
 /**
+ * Re-export useful AI SDK types
+ * Users can import these directly from ai-sdk-agent instead of 'ai'
+ */
+export type { Tool } from 'ai';
+
+/**
+ * Tool approval function - can be boolean or async function
+ * Maps to AI SDK v6's needsApproval
+ */
+export type ToolApprovalConfig<TInput = unknown> =
+  | boolean
+  | ((input: TInput) => Promise<boolean> | boolean);
+
+/**
  * Tool registration options
  */
 export interface ToolRegistrationOptions {
@@ -99,7 +113,7 @@ export interface ToolExecutionResult {
 /**
  * Tool builder configuration
  */
-export interface ToolBuilderConfig {
+export interface ToolBuilderConfig<TInput = unknown> {
   /** Tool name */
   name: string;
 
@@ -107,10 +121,20 @@ export interface ToolBuilderConfig {
   description: string;
 
   /** Input schema */
-  inputSchema: z.ZodSchema;
+  inputSchema: z.ZodSchema<TInput>;
 
   /** Execute function */
-  execute: (input: unknown) => Promise<unknown>;
+  execute: (input: TInput) => Promise<unknown>;
+
+  /**
+   * Whether tool requires approval before execution
+   * - true: always require approval
+   * - false: never require approval (default)
+   * - function: dynamic approval based on input
+   *
+   * Maps to AI SDK v6's needsApproval
+   */
+  needsApproval?: ToolApprovalConfig<TInput>;
 
   /** Permissions required */
   permissions?: string[];

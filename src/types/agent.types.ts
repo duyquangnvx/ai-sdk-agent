@@ -3,6 +3,12 @@ import type { z } from 'zod';
 import type { ContextConfig, ConversationHistory } from './context.types.js';
 
 /**
+ * Re-export useful AI SDK types for convenience
+ * Users can import from 'ai-sdk-agent' instead of 'ai' directly
+ */
+export type { LanguageModel, ModelMessage } from 'ai';
+
+/**
  * Core agent configuration
  */
 export interface AgentConfig<TCallOptions = unknown> {

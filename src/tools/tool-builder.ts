@@ -1,14 +1,18 @@
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import type { ToolRegistrationOptions, ToolBuilderConfig } from '../types/tool.types.js';
+import type {
+  ToolRegistrationOptions,
+  ToolBuilderConfig,
+  ToolApprovalConfig,
+} from '../types/tool.types.js';
 
 /**
  * Fluent builder for creating tools
  * Provides a more ergonomic way to create tools with full configuration
  */
 export class ToolBuilder<TInput = unknown, TOutput = unknown> {
-  private config: Partial<ToolBuilderConfig> = {};
+  private config: Partial<ToolBuilderConfig<TInput>> = {};
 
   /**
    * Set tool name
@@ -67,6 +71,23 @@ export class ToolBuilder<TInput = unknown, TOutput = unknown> {
   }
 
   /**
+   * Set whether tool requires approval before execution
+   * Maps to AI SDK v6's needsApproval
+   *
+   * @param approval - true, false, or a function that returns boolean
+   * @example
+   * // Always require approval
+   * .needsApproval(true)
+   *
+   * // Dynamic approval based on input
+   * .needsApproval(async ({ amount }) => amount > 1000)
+   */
+  needsApproval(approval: ToolApprovalConfig<TInput>): this {
+    this.config.needsApproval = approval;
+    return this;
+  }
+
+  /**
    * Build the tool (AI SDK Tool)
    */
   buildTool(): Tool {
@@ -75,7 +96,8 @@ export class ToolBuilder<TInput = unknown, TOutput = unknown> {
     return tool({
       description: this.config.description!,
       inputSchema: this.config.inputSchema!,
-      execute: this.config.execute!,
+      execute: this.config.execute as (input: unknown) => Promise<unknown>,
+      needsApproval: this.config.needsApproval as ToolApprovalConfig<unknown>,
     });
   }
 
@@ -122,6 +144,33 @@ export function createToolBuilder(): ToolBuilder {
 
 /**
  * Quick tool creation helper
+ *
+ * @example
+ * // Basic tool
+ * const myTool = createTool({
+ *   name: 'myTool',
+ *   description: 'Does something',
+ *   schema: z.object({ input: z.string() }),
+ *   execute: async ({ input }) => ({ result: input }),
+ * });
+ *
+ * // Tool with approval
+ * const dangerousTool = createTool({
+ *   name: 'deleteFile',
+ *   description: 'Delete a file',
+ *   schema: z.object({ path: z.string() }),
+ *   execute: async ({ path }) => { ... },
+ *   needsApproval: true, // Always require approval
+ * });
+ *
+ * // Tool with dynamic approval
+ * const paymentTool = createTool({
+ *   name: 'payment',
+ *   description: 'Process payment',
+ *   schema: z.object({ amount: z.number() }),
+ *   execute: async ({ amount }) => { ... },
+ *   needsApproval: async ({ amount }) => amount > 1000, // Only for large amounts
+ * });
  */
 export function createTool<TInput, TOutput>(
   config: {
@@ -129,6 +178,13 @@ export function createTool<TInput, TOutput>(
     description: string;
     schema: z.ZodSchema<TInput>;
     execute: (input: TInput) => Promise<TOutput>;
+    /**
+     * Whether tool requires approval before execution
+     * - true: always require approval
+     * - false: never require approval (default)
+     * - function: dynamic approval based on input
+     */
+    needsApproval?: ToolApprovalConfig<TInput>;
     permissions?: string[];
     availableToSubAgents?: boolean;
     category?: ToolRegistrationOptions['category'];
@@ -140,6 +196,7 @@ export function createTool<TInput, TOutput>(
       description: config.description,
       inputSchema: config.schema as z.ZodSchema,
       execute: config.execute as (input: unknown) => Promise<unknown>,
+      needsApproval: config.needsApproval as ToolApprovalConfig<unknown>,
     }) as Tool,
     permissions: config.permissions,
     availableToSubAgents: config.availableToSubAgents ?? true,
